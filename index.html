@@ -1,6 +1,790 @@
-<link rel="manifest" href="manifest.json" />
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Казанджийницата - Управление на резервации</title>
+  
+  <!-- ВРЪЗКА КЪМ MANIFEST ЗА ИНСТАЛИРАНЕ НА ТЕЛЕФОНА -->
+  <link rel="manifest" href="manifest.json" />
+  
+  <!-- PWA & Mobile Meta Tags -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Казанджийницата" />
+  <meta name="theme-color" content="#8B3A0F" />
+  
+  <!-- Tailwind CSS & FontAwesome -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
   <script>
-    // Регистриране на Service Worker за офлайн работа
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            copper: {
+              DEFAULT: '#B85D19',
+              dark: '#8B3A0F',
+              light: '#D37532',
+            },
+            parchment: {
+              DEFAULT: '#F4ECE1',
+              light: '#FBF8F2',
+              dark: '#E2D5C3',
+            },
+            cinnamon: '#7A3210',
+            wood: '#2C1B10'
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      background-color: #FBF8F2;
+      color: #2C1B10;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .custom-scroll::-webkit-scrollbar {
+      height: 6px;
+      width: 6px;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: #D37532;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body class="min-h-screen pb-24">
+
+  <!-- TOP HEADER -->
+  <header class="bg-copper-dark text-parchment-light shadow-md sticky top-0 z-30 px-4 py-3 border-b-2 border-copper">
+    <div class="max-w-5xl mx-auto flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <i class="fa-solid fa-fire-burner text-2xl text-amber-300"></i>
+        <div>
+          <h1 class="text-xl font-bold tracking-tight">Казанджийницата</h1>
+          <p class="text-xs text-amber-200">Резервации и отчетност</p>
+        </div>
+      </div>
+      <div class="flex items-center space-x-2 text-xs">
+        <span id="sync-status" class="bg-amber-900/60 px-2 py-1 rounded border border-amber-400/30">
+          <i class="fa-solid fa-hard-drive"></i> Локална памет
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-5xl mx-auto p-3 sm:p-5 space-y-5">
+
+    <!-- KPI DASHBOARD (ТАБЛО) -->
+    <section class="bg-parchment p-4 rounded-xl border border-parchment-dark shadow-sm">
+      <h2 class="text-sm font-bold uppercase tracking-wider text-cinnamon mb-3 flex items-center gap-2">
+        <i class="fa-solid fa-chart-line"></i> Общ финансов & производствен баланс
+      </h2>
+      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 sm:gap-3 text-center">
+        
+        <div class="bg-white p-2.5 rounded-lg border border-amber-200 shadow-sm">
+          <span class="text-[11px] text-gray-600 block">Общ приход</span>
+          <span id="kpi-income" class="text-lg font-black text-emerald-700">0.00 лв.</span>
+        </div>
+
+        <div class="bg-white p-2.5 rounded-lg border border-amber-200 shadow-sm">
+          <span class="text-[11px] text-gray-600 block">Общ разход</span>
+          <span id="kpi-expense" class="text-lg font-black text-rose-700">0.00 лв.</span>
+        </div>
+
+        <div class="bg-white p-2.5 rounded-lg border border-amber-200 shadow-sm col-span-2 sm:col-span-1">
+          <span class="text-[11px] text-gray-600 block">Чиста печалба</span>
+          <span id="kpi-profit" class="text-lg font-black text-copper-dark">0.00 лв.</span>
+        </div>
+
+        <div class="bg-white p-2.5 rounded-lg border border-amber-200 shadow-sm">
+          <span class="text-[11px] text-gray-600 block">Резервации</span>
+          <span id="kpi-count" class="text-lg font-black text-wood">0</span>
+        </div>
+
+        <div class="bg-white p-2.5 rounded-lg border border-amber-200 shadow-sm">
+          <span class="text-[11px] text-gray-600 block">Вложена суровина</span>
+          <span id="kpi-kg" class="text-lg font-black text-wood">0 кг</span>
+        </div>
+
+        <div class="bg-white p-2.5 rounded-lg border border-amber-200 shadow-sm">
+          <span class="text-[11px] text-gray-600 block">Добита ракия</span>
+          <span id="kpi-liters" class="text-lg font-black text-amber-700">0 л</span>
+        </div>
+
+      </div>
+      <!-- Рандеман лента -->
+      <div class="mt-3 bg-white/70 px-3 py-1.5 rounded-lg text-xs flex justify-between items-center text-gray-700 border border-parchment-dark">
+        <span><i class="fa-solid fa-gauge-high text-copper"></i> Среден добив (Рандеман):</span>
+        <strong id="kpi-yield" class="text-copper-dark font-bold">0.0 L / 100 кг</strong>
+      </div>
+    </section>
+
+    <!-- SECTION SWITCH TABS -->
+    <div class="flex border-b border-parchment-dark space-x-2 text-sm font-semibold overflow-x-auto pb-1 custom-scroll">
+      <button onclick="switchTab('schedule')" id="tab-btn-schedule" class="tab-btn active px-4 py-2 rounded-t-lg bg-copper text-white flex items-center gap-2">
+        <i class="fa-solid fa-calendar-day"></i> График
+      </button>
+      <button onclick="switchTab('new')" id="tab-btn-new" class="tab-btn px-4 py-2 rounded-t-lg bg-parchment text-wood hover:bg-parchment-dark flex items-center gap-2">
+        <i class="fa-solid fa-plus-circle"></i> Нов казан
+      </button>
+      <button onclick="switchTab('table')" id="tab-btn-table" class="tab-btn px-4 py-2 rounded-t-lg bg-parchment text-wood hover:bg-parchment-dark flex items-center gap-2">
+        <i class="fa-solid fa-table-list"></i> Журнал
+      </button>
+      <button onclick="switchTab('stats')" id="tab-btn-stats" class="tab-btn px-4 py-2 rounded-t-lg bg-parchment text-wood hover:bg-parchment-dark flex items-center gap-2">
+        <i class="fa-solid fa-chart-pie"></i> Трендове
+      </button>
+      <button onclick="switchTab('settings')" id="tab-btn-settings" class="tab-btn px-4 py-2 rounded-t-lg bg-parchment text-wood hover:bg-parchment-dark flex items-center gap-2">
+        <i class="fa-solid fa-gear"></i> Данни & Експорт
+      </button>
+    </div>
+
+    <!-- TAB 1: SCHEDULE (ГРАФИК) -->
+    <div id="tab-schedule" class="tab-content space-y-4">
+      <div class="flex justify-between items-center">
+        <h3 class="font-bold text-lg text-cinnamon flex items-center gap-2">
+          <i class="fa-regular fa-calendar-check"></i> Предстоящи и текущи казани
+        </h3>
+        <button onclick="switchTab('new')" class="bg-copper hover:bg-copper-dark text-white text-xs px-3 py-1.5 rounded-lg shadow">
+          + Запази час
+        </button>
+      </div>
+      <div id="schedule-container" class="space-y-4">
+        <!-- Попълва се динамично от JS -->
+      </div>
+    </div>
+
+    <!-- TAB 2: NEW RESERVATION FORM (ФОРМА) -->
+    <div id="tab-new" class="tab-content hidden">
+      <div class="bg-white p-5 rounded-xl border border-amber-200 shadow-sm max-w-xl mx-auto">
+        <h3 class="font-bold text-lg text-copper-dark mb-4 flex items-center gap-2">
+          <i class="fa-solid fa-calendar-plus"></i> Нова резервация за варене
+        </h3>
+
+        <!-- ДУБЛИРАН ЧАС ПРЕДУПРЕЖДЕНИЕ -->
+        <div id="conflict-warning" class="hidden mb-4 p-3 bg-red-100 border-l-4 border-red-500 text-red-700 text-sm rounded">
+          <i class="fa-solid fa-triangle-exclamation mr-1"></i>
+          <span id="conflict-text">Внимание: Вече има резервация за този ден и час!</span>
+        </div>
+
+        <form id="reservation-form" onsubmit="handleFormSubmit(event)" class="space-y-4">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-gray-700 mb-1">Дата *</label>
+              <input type="date" id="form-date" required onchange="checkTimeConflict()" class="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-copper focus:border-copper" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-gray-700 mb-1">Час *</label>
+              <input type="time" id="form-time" required onchange="checkTimeConflict()" class="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-copper focus:border-copper" />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-gray-700 mb-1">Име на клиент *</label>
+              <input type="text" id="form-client" placeholder="напр. Иван Иванов" required class="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-copper" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-gray-700 mb-1">Телефон (за SMS напомняне)</label>
+              <input type="tel" id="form-phone" placeholder="0888 123 456" class="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-copper" />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-gray-700 mb-1">Вид суровина *</label>
+              <select id="form-raw-type" required class="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-copper">
+                <option value="сливи">Сливи</option>
+                <option value="грозде">Грозде</option>
+                <option value="кайсии">Кайсии</option>
+                <option value="ябълки">Ябълки</option>
+                <option value="круши">Круши</option>
+                <option value="друго">Друго</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-gray-700 mb-1">Количество суровина (кг) *</label>
+              <input type="number" id="form-kg" min="0" step="1" required placeholder="500" class="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-copper" />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-3 gap-2">
+            <div>
+              <label class="block text-xs font-semibold text-gray-700 mb-1">Добита ракия (л)</label>
+              <input type="number" id="form-liters" min="0" step="0.5" placeholder="0" class="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-copper" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-gray-700 mb-1">Приход (лв.)</label>
+              <input type="number" id="form-income" min="0" step="0.5" placeholder="0.00" class="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-copper" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-gray-700 mb-1">Разход (лв.)</label>
+              <input type="number" id="form-expense" min="0" step="0.5" placeholder="0.00" class="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-copper" />
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-gray-700 mb-1">Бележка (по избор)</label>
+            <textarea id="form-notes" rows="2" placeholder="Дърва от клиента, захарност 22°..." class="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-copper"></textarea>
+          </div>
+
+          <button type="submit" class="w-full bg-copper-dark hover:bg-cinnamon text-white font-bold py-3 rounded-lg shadow-md transition">
+            <i class="fa-solid fa-floppy-disk mr-1"></i> Запази резервацията
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- TAB 3: TABLE JOURNAL -->
+    <div id="tab-table" class="tab-content hidden space-y-3">
+      <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
+        <h3 class="font-bold text-lg text-cinnamon">
+          <i class="fa-solid fa-list-check"></i> Пълен списък на казаните
+        </h3>
+        <input type="text" id="search-input" onkeyup="filterTable()" placeholder="Търси по клиент, плод или дата..." class="border border-gray-300 rounded-lg p-2 text-xs w-full sm:w-64" />
+      </div>
+
+      <div class="overflow-x-auto bg-white rounded-xl border border-amber-200 shadow-sm custom-scroll">
+        <table class="min-w-full text-xs text-left" id="reservations-table">
+          <thead class="bg-parchment-dark text-wood uppercase font-bold border-b">
+            <tr>
+              <th class="p-2.5">Дата и час</th>
+              <th class="p-2.5">Клиент</th>
+              <th class="p-2.5">Суровина</th>
+              <th class="p-2.5 text-right">Кг</th>
+              <th class="p-2.5 text-right">Литри</th>
+              <th class="p-2.5 text-right">Приход</th>
+              <th class="p-2.5 text-right">Разход</th>
+              <th class="p-2.5">Бележка</th>
+              <th class="p-2.5 text-center">Действие</th>
+            </tr>
+          </thead>
+          <tbody id="table-body" class="divide-y divide-gray-100">
+            <!-- Попълва се динамично -->
+          </tbody>
+          <tfoot class="bg-amber-100 font-bold border-t-2 border-amber-300 text-wood">
+            <tr>
+              <td colspan="3" class="p-2.5 text-right font-black">ОБЩО:</td>
+              <td id="total-kg-cell" class="p-2.5 text-right">0 кг</td>
+              <td id="total-liters-cell" class="p-2.5 text-right">0 л</td>
+              <td id="total-income-cell" class="p-2.5 text-right text-emerald-700">0.00 лв</td>
+              <td id="total-expense-cell" class="p-2.5 text-right text-rose-700">0.00 лв</td>
+              <td colspan="2"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+
+    <!-- TAB 4: STATS & CHARTS -->
+    <div id="tab-stats" class="tab-content hidden space-y-5">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="bg-white p-4 rounded-xl border border-amber-200 shadow-sm">
+          <h4 class="font-bold text-sm text-cinnamon mb-3">
+            <i class="fa-solid fa-chart-simple"></i> Приход по месеци (лв.)
+          </h4>
+          <canvas id="monthlyIncomeChart" height="200"></canvas>
+        </div>
+
+        <div class="bg-white p-4 rounded-xl border border-amber-200 shadow-sm">
+          <h4 class="font-bold text-sm text-cinnamon mb-3">
+            <i class="fa-solid fa-pie-chart"></i> Използвана суровина по вид (кг)
+          </h4>
+          <canvas id="materialChart" height="200"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 5: DATA, CSV IMPORT/EXPORT & BACKUP -->
+    <div id="tab-settings" class="tab-content hidden space-y-5">
+      
+      <!-- CSV ЕКСПОРТ -->
+      <div class="bg-white p-4 rounded-xl border border-amber-200 shadow-sm">
+        <h4 class="font-bold text-base text-copper-dark mb-2 flex items-center gap-2">
+          <i class="fa-solid fa-file-export"></i> Експортиране в CSV (Excel)
+        </h4>
+        <p class="text-xs text-gray-600 mb-3">Изберете кои колони да бъдат включени във файла:</p>
+        
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4 text-xs">
+          <label class="flex items-center gap-1.5"><input type="checkbox" id="col-date" checked class="accent-copper"> Дата и час</label>
+          <label class="flex items-center gap-1.5"><input type="checkbox" id="col-client" checked class="accent-copper"> Клиент</label>
+          <label class="flex items-center gap-1.5"><input type="checkbox" id="col-phone" checked class="accent-copper"> Телефон</label>
+          <label class="flex items-center gap-1.5"><input type="checkbox" id="col-type" checked class="accent-copper"> Суровина</label>
+          <label class="flex items-center gap-1.5"><input type="checkbox" id="col-kg" checked class="accent-copper"> Количество (кг)</label>
+          <label class="flex items-center gap-1.5"><input type="checkbox" id="col-liters" checked class="accent-copper"> Добита ракия (л)</label>
+          <label class="flex items-center gap-1.5"><input type="checkbox" id="col-income" checked class="accent-copper"> Приход (лв)</label>
+          <label class="flex items-center gap-1.5"><input type="checkbox" id="col-expense" checked class="accent-copper"> Разход (лв)</label>
+          <label class="flex items-center gap-1.5"><input type="checkbox" id="col-notes" checked class="accent-copper"> Бележка</label>
+        </div>
+
+        <button onclick="exportCustomCSV()" class="bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold px-4 py-2 rounded-lg flex items-center gap-2">
+          <i class="fa-solid fa-download"></i> Изтегли избран CSV файл
+        </button>
+      </div>
+
+      <!-- CSV ИМПОРТ -->
+      <div class="bg-white p-4 rounded-xl border border-amber-200 shadow-sm">
+        <h4 class="font-bold text-base text-copper-dark mb-2 flex items-center gap-2">
+          <i class="fa-solid fa-file-import"></i> Импортиране от CSV
+        </h4>
+        <p class="text-xs text-gray-600 mb-3">Колони: дата, час, клиент, суровина, кг, литри, приход, разход, бележка</p>
+        <input type="file" id="csv-file-input" accept=".csv" class="text-xs text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-amber-100 file:text-wood hover:file:bg-amber-200" />
+        <button onclick="importCSV()" class="mt-3 bg-wood hover:bg-black text-white text-xs font-bold px-4 py-2 rounded-lg flex items-center gap-2">
+          <i class="fa-solid fa-upload"></i> Качи данните от CSV
+        </button>
+      </div>
+
+      <!-- ДЪЛГОСРОЧЕН БЕКЪП -->
+      <div class="bg-parchment p-4 rounded-xl border border-parchment-dark shadow-sm">
+        <h4 class="font-bold text-base text-cinnamon mb-2 flex items-center gap-2">
+          <i class="fa-solid fa-shield-halved"></i> Защита от загуба на данни (Смяна на телефон)
+        </h4>
+        <p class="text-xs text-gray-700 mb-3">
+          Свалете пълния архив на данните и го запазете на сигурно място.
+        </p>
+        <div class="flex flex-wrap gap-2">
+          <button onclick="downloadBackupJSON()" class="bg-copper hover:bg-copper-dark text-white text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5">
+            <i class="fa-solid fa-cloud-arrow-down"></i> Изтегли пълен бекъп
+          </button>
+          <label class="cursor-pointer bg-white border border-gray-400 text-gray-800 hover:bg-gray-50 text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5">
+            <i class="fa-solid fa-cloud-arrow-up"></i> Възстанови от файл
+            <input type="file" id="json-backup-input" accept=".json" onchange="restoreBackupJSON(event)" class="hidden" />
+          </label>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- JAVASCRIPT ЛОГИКА И СЪХРАНЕНИЕ -->
+  <script>
+    let reservations = JSON.parse(localStorage.getItem('kazan_reservations')) || [];
+    let incomeChartInstance = null;
+    let materialChartInstance = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('form-date').value = new Date().toISOString().split('T')[0];
+      document.getElementById('form-time').value = "08:00";
+      updateAllViews();
+    });
+
+    function saveToStorage() {
+      localStorage.setItem('kazan_reservations', JSON.stringify(reservations));
+    }
+
+    function updateAllViews() {
+      renderKPIs();
+      renderSchedule();
+      renderTable();
+      renderCharts();
+    }
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('bg-copper', 'text-white');
+        btn.classList.add('bg-parchment', 'text-wood');
+      });
+
+      document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+      const activeBtn = document.getElementById(`tab-btn-${tabId}`);
+      activeBtn.classList.add('bg-copper', 'text-white');
+      activeBtn.classList.remove('bg-parchment', 'text-wood');
+
+      if (tabId === 'stats') {
+        setTimeout(renderCharts, 100);
+      }
+    }
+
+    function checkTimeConflict() {
+      const selectedDate = document.getElementById('form-date').value;
+      const selectedTime = document.getElementById('form-time').value;
+      const warningBox = document.getElementById('conflict-warning');
+      const warningText = document.getElementById('conflict-text');
+
+      if (!selectedDate || !selectedTime) {
+        warningBox.classList.add('hidden');
+        return;
+      }
+
+      const conflict = reservations.find(r => r.date === selectedDate && r.time === selectedTime);
+      if (conflict) {
+        warningText.innerHTML = `⚠️ <strong>Внимание!</strong> Вече има запазен час на ${selectedDate} в ${selectedTime} ч. за клиент: <strong>${conflict.client}</strong>.`;
+        warningBox.classList.remove('hidden');
+      } else {
+        warningBox.classList.add('hidden');
+      }
+    }
+
+    function handleFormSubmit(event) {
+      event.preventDefault();
+
+      const newRecord = {
+        id: Date.now().toString(),
+        date: document.getElementById('form-date').value,
+        time: document.getElementById('form-time').value,
+        client: document.getElementById('form-client').value.trim(),
+        phone: document.getElementById('form-phone').value.trim(),
+        rawType: document.getElementById('form-raw-type').value,
+        kg: parseFloat(document.getElementById('form-kg').value) || 0,
+        liters: parseFloat(document.getElementById('form-liters').value) || 0,
+        income: parseFloat(document.getElementById('form-income').value) || 0,
+        expense: parseFloat(document.getElementById('form-expense').value) || 0,
+        notes: document.getElementById('form-notes').value.trim()
+      };
+
+      reservations.push(newRecord);
+      saveToStorage();
+      updateAllViews();
+
+      document.getElementById('reservation-form').reset();
+      document.getElementById('form-date').value = new Date().toISOString().split('T')[0];
+      document.getElementById('form-time').value = "08:00";
+      document.getElementById('conflict-warning').classList.add('hidden');
+
+      alert('Резервацията е записана успешно!');
+      switchTab('schedule');
+    }
+
+    function renderKPIs() {
+      const totalIncome = reservations.reduce((s, r) => s + (r.income || 0), 0);
+      const totalExpense = reservations.reduce((s, r) => s + (r.expense || 0), 0);
+      const totalProfit = totalIncome - totalExpense;
+      const totalKg = reservations.reduce((s, r) => s + (r.kg || 0), 0);
+      const totalLiters = reservations.reduce((s, r) => s + (r.liters || 0), 0);
+      const count = reservations.length;
+
+      document.getElementById('kpi-income').innerText = totalIncome.toFixed(2) + ' лв.';
+      document.getElementById('kpi-expense').innerText = totalExpense.toFixed(2) + ' лв.';
+      document.getElementById('kpi-profit').innerText = totalProfit.toFixed(2) + ' лв.';
+      document.getElementById('kpi-count').innerText = count;
+      document.getElementById('kpi-kg').innerText = totalKg.toLocaleString('bg-BG') + ' кг';
+      document.getElementById('kpi-liters').innerText = totalLiters.toLocaleString('bg-BG') + ' л';
+
+      const randeman = totalKg > 0 ? ((totalLiters / totalKg) * 100).toFixed(1) : '0.0';
+      document.getElementById('kpi-yield').innerText = `${randeman} L ракия / 100 кг материал`;
+    }
+
+    function renderSchedule() {
+      const container = document.getElementById('schedule-container');
+      container.innerHTML = '';
+
+      if (reservations.length === 0) {
+        container.innerHTML = `<div class="text-center py-8 text-gray-500 text-sm">Няма записани резервации.</div>`;
+        return;
+      }
+
+      const sorted = [...reservations].sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+
+      const groups = {};
+      sorted.forEach(r => {
+        if (!groups[r.date]) groups[r.date] = [];
+        groups[r.date].push(r);
+      });
+
+      for (const [date, items] of Object.entries(groups)) {
+        const dateCard = document.createElement('div');
+        dateCard.className = 'bg-white rounded-xl border border-amber-200 overflow-hidden shadow-sm';
+
+        const dateObj = new Date(date + 'T00:00:00');
+        const formattedDate = dateObj.toLocaleDateString('bg-BG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+        let itemsHtml = items.map(item => {
+          const smsText = encodeURIComponent(`Здравейте, ${item.client}! Напомняме Ви за резервирания казан за ракия на ${item.date} в ${item.time} ч. Казанджийницата Ви очаква!`);
+          const smsLink = item.phone ? `sms:${item.phone}?body=${smsText}` : '#';
+
+          return `
+            <div class="p-3 border-b border-gray-100 last:border-0 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+              <div class="space-y-0.5">
+                <div class="flex items-center gap-2">
+                  <span class="bg-copper text-white font-bold text-xs px-2 py-0.5 rounded">${item.time} ч.</span>
+                  <strong class="text-wood text-sm">${escapeHtml(item.client)}</strong>
+                  ${item.phone ? `<a href="tel:${item.phone}" class="text-xs text-copper underline"><i class="fa-solid fa-phone"></i> ${item.phone}</a>` : ''}
+                </div>
+                <div class="text-xs text-gray-600">
+                  <span>Суровина: <strong>${item.rawType}</strong> (${item.kg} кг)</span>
+                  ${item.liters ? `<span class="ml-2 text-amber-700">| Добита: <strong>${item.liters} л</strong></span>` : ''}
+                  ${item.notes ? `<span class="ml-2 text-gray-500 italic block sm:inline">Бележка: ${escapeHtml(item.notes)}</span>` : ''}
+                </div>
+              </div>
+              <div class="flex items-center space-x-2 self-end sm:self-auto text-xs">
+                ${item.phone ? `
+                  <a href="${smsLink}" class="bg-amber-100 hover:bg-amber-200 text-copper-dark px-2.5 py-1.5 rounded flex items-center gap-1 font-semibold">
+                    <i class="fa-solid fa-comment-sms"></i> SMS
+                  </a>
+                ` : ''}
+                <button onclick="deleteReservation('${item.id}')" class="text-red-500 hover:text-red-700 px-2 py-1">
+                  <i class="fa-solid fa-trash-can"></i>
+                </button>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        dateCard.innerHTML = `
+          <div class="bg-parchment-dark/70 px-4 py-2 font-bold text-xs uppercase tracking-wider text-cinnamon flex justify-between items-center">
+            <span><i class="fa-regular fa-calendar"></i> ${formattedDate}</span>
+            <span class="bg-white/80 px-2 py-0.5 rounded text-[11px]">${items.length} казана</span>
+          </div>
+          <div class="divide-y divide-gray-100">${itemsHtml}</div>
+        `;
+
+        container.appendChild(dateCard);
+      }
+    }
+
+    function renderTable(filterKeyword = '') {
+      const tbody = document.getElementById('table-body');
+      tbody.innerHTML = '';
+
+      let filtered = [...reservations].sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
+
+      if (filterKeyword) {
+        const kw = filterKeyword.toLowerCase();
+        filtered = filtered.filter(r => 
+          r.client.toLowerCase().includes(kw) || 
+          r.rawType.toLowerCase().includes(kw) || 
+          r.date.includes(kw)
+        );
+      }
+
+      let sumKg = 0, sumLiters = 0, sumIncome = 0, sumExpense = 0;
+
+      filtered.forEach(r => {
+        sumKg += (r.kg || 0);
+        sumLiters += (r.liters || 0);
+        sumIncome += (r.income || 0);
+        sumExpense += (r.expense || 0);
+
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-amber-50/50 transition";
+        tr.innerHTML = `
+          <td class="p-2.5 font-medium whitespace-nowrap">${r.date} ${r.time}</td>
+          <td class="p-2.5 font-semibold text-wood">${escapeHtml(r.client)}</td>
+          <td class="p-2.5 capitalize">${escapeHtml(r.rawType)}</td>
+          <td class="p-2.5 text-right font-medium">${r.kg}</td>
+          <td class="p-2.5 text-right font-medium text-amber-800">${r.liters || 0}</td>
+          <td class="p-2.5 text-right text-emerald-700 font-bold">${(r.income || 0).toFixed(2)}</td>
+          <td class="p-2.5 text-right text-rose-700 font-bold">${(r.expense || 0).toFixed(2)}</td>
+          <td class="p-2.5 text-gray-500 italic max-w-xs truncate">${escapeHtml(r.notes || '-')}</td>
+          <td class="p-2.5 text-center">
+            <button onclick="deleteReservation('${r.id}')" class="text-rose-600 hover:text-rose-900 p-1">
+              <i class="fa-solid fa-trash"></i>
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      document.getElementById('total-kg-cell').innerText = sumKg.toLocaleString('bg-BG') + ' кг';
+      document.getElementById('total-liters-cell').innerText = sumLiters.toLocaleString('bg-BG') + ' л';
+      document.getElementById('total-income-cell').innerText = sumIncome.toFixed(2) + ' лв';
+      document.getElementById('total-expense-cell').innerText = sumExpense.toFixed(2) + ' лв';
+    }
+
+    function filterTable() {
+      const kw = document.getElementById('search-input').value;
+      renderTable(kw);
+    }
+
+    function deleteReservation(id) {
+      if (confirm('Сигурни ли сте, че искате да изтриете този запис?')) {
+        reservations = reservations.filter(r => r.id !== id);
+        saveToStorage();
+        updateAllViews();
+      }
+    }
+
+    function renderCharts() {
+      const monthlyIncome = {};
+      reservations.forEach(r => {
+        if (!r.date) return;
+        const monthKey = r.date.substring(0, 7);
+        monthlyIncome[monthKey] = (monthlyIncome[monthKey] || 0) + (r.income || 0);
+      });
+
+      const months = Object.keys(monthlyIncome).sort();
+      const incomeValues = months.map(m => monthlyIncome[m]);
+
+      const ctxIncome = document.getElementById('monthlyIncomeChart').getContext('2d');
+      if (incomeChartInstance) incomeChartInstance.destroy();
+
+      incomeChartInstance = new Chart(ctxIncome, {
+        type: 'bar',
+        data: {
+          labels: months,
+          datasets: [{
+            label: 'Приход (лв.)',
+            data: incomeValues,
+            backgroundColor: '#B85D19',
+            borderRadius: 4
+          }]
+        },
+        options: { responsive: true, scales: { y: { beginAtZero: true } } }
+      });
+
+      const materialMap = {};
+      reservations.forEach(r => {
+        const type = r.rawType || 'друго';
+        materialMap[type] = (materialMap[type] || 0) + (r.kg || 0);
+      });
+
+      const ctxMat = document.getElementById('materialChart').getContext('2d');
+      if (materialChartInstance) materialChartInstance.destroy();
+
+      materialChartInstance = new Chart(ctxMat, {
+        type: 'doughnut',
+        data: {
+          labels: Object.keys(materialMap),
+          datasets: [{
+            data: Object.values(materialMap),
+            backgroundColor: ['#8B3A0F', '#B85D19', '#D37532', '#7A3210', '#D4AC0D', '#7D6608']
+          }]
+        },
+        options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+      });
+    }
+
+    function exportCustomCSV() {
+      if (reservations.length === 0) {
+        alert('Няма данни за експорт!');
+        return;
+      }
+
+      const cols = [];
+      if (document.getElementById('col-date').checked) cols.push({ key: 'date_time', label: 'Дата и час' });
+      if (document.getElementById('col-client').checked) cols.push({ key: 'client', label: 'Клиент' });
+      if (document.getElementById('col-phone').checked) cols.push({ key: 'phone', label: 'Телефон' });
+      if (document.getElementById('col-type').checked) cols.push({ key: 'rawType', label: 'Суровина' });
+      if (document.getElementById('col-kg').checked) cols.push({ key: 'kg', label: 'Суровина (кг)' });
+      if (document.getElementById('col-liters').checked) cols.push({ key: 'liters', label: 'Добита ракия (л)' });
+      if (document.getElementById('col-income').checked) cols.push({ key: 'income', label: 'Приход (лв)' });
+      if (document.getElementById('col-expense').checked) cols.push({ key: 'expense', label: 'Разход (лв)' });
+      if (document.getElementById('col-notes').checked) cols.push({ key: 'notes', label: 'Бележка' });
+
+      if (cols.length === 0) {
+        alert('Моля, изберете поне една колона за експортиране!');
+        return;
+      }
+
+      let csvContent = '\uFEFF'; 
+      csvContent += cols.map(c => `"${c.label}"`).join(';') + '\r\n';
+
+      reservations.forEach(r => {
+        const row = cols.map(c => {
+          if (c.key === 'date_time') return `"${r.date} ${r.time}"`;
+          return `"${r[c.key] !== undefined ? String(r[c.key]).replace(/"/g, '""') : ''}"`;
+        });
+        csvContent += row.join(';') + '\r\n';
+      });
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `kazandjiinica_export_${new Date().toISOString().split('T')[0]}.csv`;
+      link.click();
+    }
+
+    function importCSV() {
+      const fileInput = document.getElementById('csv-file-input');
+      const file = fileInput.files[0];
+      if (!file) {
+        alert('Моля, изберете CSV файл!');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const text = e.target.result;
+        const lines = text.split(/\r\n|\n/).filter(line => line.trim() !== '');
+        
+        if (lines.length < 2) {
+          alert('CSV файлът е празен или липсват редове!');
+          return;
+        }
+
+        let importedCount = 0;
+        for (let i = 1; i < lines.length; i++) {
+          const sep = lines[i].includes(';') ? ';' : ',';
+          const cols = lines[i].split(sep).map(col => col.replace(/^"(.*)"$/, '$1').trim());
+
+          if (cols.length >= 3) {
+            reservations.push({
+              id: (Date.now() + i).toString(),
+              date: cols[0] || new Date().toISOString().split('T')[0],
+              time: cols[1] || '08:00',
+              client: cols[2] || 'Неизвестен',
+              phone: '',
+              rawType: cols[3] || 'сливи',
+              kg: parseFloat(cols[4]) || 0,
+              liters: parseFloat(cols[5]) || 0,
+              income: parseFloat(cols[6]) || 0,
+              expense: parseFloat(cols[7]) || 0,
+              notes: cols[8] || ''
+            });
+            importedCount++;
+          }
+        }
+
+        saveToStorage();
+        updateAllViews();
+        alert(`Успешно импортирани ${importedCount} резервации!`);
+        fileInput.value = '';
+        switchTab('table');
+      };
+      reader.readAsText(file);
+    }
+
+    function downloadBackupJSON() {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(reservations, null, 2));
+      const dlAnchorElem = document.createElement('a');
+      dlAnchorElem.setAttribute("href", dataStr);
+      dlAnchorElem.setAttribute("download", `kazandjiinica_backup_${new Date().toISOString().split('T')[0]}.json`);
+      dlAnchorElem.click();
+    }
+
+    function restoreBackupJSON(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const parsed = JSON.parse(e.target.result);
+          if (Array.isArray(parsed)) {
+            if (confirm(`Намерени са ${parsed.length} записа. Желаете ли да замените текущите данни?`)) {
+              reservations = parsed;
+              saveToStorage();
+              updateAllViews();
+              alert('Данните са успешно възстановени!');
+              switchTab('schedule');
+            }
+          } else {
+            alert('Невалиден формат на файла!');
+          }
+        } catch (err) {
+          alert('Грешка при четене на архива!');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function escapeHtml(text) {
+      if (!text) return '';
+      return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+  </script>
+
+  <!-- Скрипт за ОФЛАЙН режим -->
+  <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js')
