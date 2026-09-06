@@ -1,0 +1,13 @@
+<link rel="manifest" href="manifest.json" />
+  <script>
+    // Регистриране на Service Worker за офлайн работа
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then(reg => console.log('Офлайн режимът е активен!', reg))
+          .catch(err => console.error('Грешка при офлайн режим', err));
+      });
+    }
+  </script>
+</body>
+</html>
